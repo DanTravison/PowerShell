@@ -6,6 +6,10 @@ enum Platform
     OSX = '3';
 }
 
+<#
+    Provides an alternative to $IsWindows, $IsLinux, etc. that is also compatible
+    with Windows PowerShell.
+#>
 function Get-Platform
 {
     [Platform] $value = [Platform]::Unknown
@@ -32,7 +36,7 @@ function Get-Platform
 [Platform] $Platform = Get-Platform
 
 # Define a type to encapsulate ShellExecuteEx with the 'runas' verb
-# This is only used on Windows.
+# for use on Windows.
 [string] $elevate = @"
 using System;
 using System.Runtime.InteropServices;
@@ -118,6 +122,10 @@ if ($Platform -eq [Platform]::Windows)
     {
         # do something requiring elevated rights.
     }
+    else
+    {
+        Start-Elevated -Command "some command"
+    }
 #>
 function Test-Elevated
 {
@@ -140,7 +148,10 @@ function Test-Elevated
     throw "This function is not supported on this platform: $Platform"
 }
 
-function Invoke-WindowsElevated
+<#
+    Creates an elevated PowerShell process on windows using ShellExecuteEx(runas)
+#>
+function Start-WindowsElevated
 {
     param
     (
@@ -163,17 +174,19 @@ function Invoke-WindowsElevated
 
     if (-not [string]::IsNullOrEmpty($Command))
     {
-        $null = $sb.Append(" -Command $Command")
+        $null = $sb.Append(" -Command `"$Command`"")
     }
     else
     {
         $null = $sb.Append(" -NoExit")
     }
 
+    [string] $parameters = $sb.ToString()
+
     if (-not $isElevated)
     {
         Write-Verbose -Message "Running $pshome\\powershell.exe $parameters"
-        [bool] $showWindow = $ShowWindow.IsPresent -or $NoExit.IsPresent -or [string]::IsNullOrEmpty($Command)
+        [bool] $showWindow = $ShowWindow -or $NoExit -or [string]::IsNullOrEmpty($Command)
         [Internal.Interop.Elevate]::Run("$pshome\\powershell.exe", $null, $parameters, $showWindow)
     }
     elseif ([string]::IsNullOrEmpty($parameters))
@@ -186,7 +199,10 @@ function Invoke-WindowsElevated
     }
 }
 
-function Invoke-LinuxElevated
+<#
+    Runs PowerShell through sudo
+#>
+function Start-LinuxElevated
 {
     param
     (
@@ -256,11 +272,11 @@ function Start-Elevated
     [bool] $isElevated = Test-Elevated
     if ($Platform -eq [Platform]::Windows)
     {
-        Invoke-WindowsElevated -NoProfile $NoProfile.IsPresent -NoExit $NoExit.IsPresent -ShowWindow $ShowWindow.IsPresent -Command $command
+        Start-WindowsElevated -NoProfile $NoProfile.IsPresent -NoExit $NoExit.IsPresent -ShowWindow $ShowWindow.IsPresent -Command $command
     }
     elseif ($Platform -eq [Platform]::Linux)
     {
-        Invoke-LinuxElevated -NoProfile $NoProfile.IsPresent -Command $command
+        Start-LinuxElevated -NoProfile $NoProfile.IsPresent -Command $command
     }
 }
 
