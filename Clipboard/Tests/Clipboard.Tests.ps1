@@ -1,15 +1,50 @@
 using namespace PowerShell.Clipboard
 Import-Module .\Clipboard.psd1
 
+enum Platform
+{
+    Unknown = '0';
+    Windows = '1';
+    Linux = '2';
+    OSX = '3';
+}
+
+function Get-Platform
+{
+    [Platform] $value = [Platform]::Unknown
+
+    if ($PSHOME.EndsWith('\WindowsPowerShell\v1.0', [System.StringComparison]::OrdinalIgnoreCase))
+    {
+       $value = [Platform]::Windows
+    }
+    elseif ((Get-Variable -Name IsWindows -ErrorAction Ignore) -and $IsWindows)
+    {
+        $value = [Platform]::Windows
+    }
+    elseif ((Get-Variable -Name IsLinux -ErrorAction Ignore) -and $IsLinux)
+    {
+        $value = [Platform]::Linux
+    }
+    elseif ((Get-Variable -Name IsOSX -ErrorAction Ignore) -and $IsOSX)
+    {
+        $value = [Platform]::OSX
+    }
+    return $value
+}
+
 Describe "Clipboard" -Tag @('CI') `
 {
+    BeforeAll {
+        [Platform] $platform = Get-Platform
+    }
+
     Context 'Clear Clipboard' `
     {
         BeforeEach {
             [Clipboard]::SetText("Clear Clipboard test", [ClipboardTextFormat]::Text)
         }
 
-        It 'Verifies the clipboard is empty after [Clipboard]::Clear' `
+        It 'Verifies the clipboard is empty after [Clipboard]::Clear' -skip:($platform -ne [Platform]::Windows) `
         {
             [Clipboard]::Contains([ClipboardTextFormat]::Text) | Should -Be $true
             [Clipboard]::Clear()
@@ -18,10 +53,10 @@ Describe "Clipboard" -Tag @('CI') `
             $formats.Count | Should -Be 0
         }
 
-        It 'Verifies the clipboard is empty after Clear-Clipboard' `
+        It 'Verifies the clipboard is empty after Clear-Clipboard' -skip:($platform -ne [Platform]::Windows) `
         {
             [Clipboard]::Contains([ClipboardTextFormat]::Text) | Should -Be $true
-            Clear-Clipboard
+            Clipboard\Clear-Clipboard
             $formats = [Clipboard]::GetFormats()
             $formats.Count | Should -Be 0
         }
@@ -33,23 +68,23 @@ Describe "Clipboard" -Tag @('CI') `
             [Clipboard]::Clear()
         }
 
-        It 'Verifies the clipboard can be set and retrieved as Unicode' `
+        It 'Verifies the clipboard can be set and retrieved as Unicode' -skip:($platform -ne [Platform]::Windows) `
         {
 			$expected = 'Get-Clipbooard Text test'
-			Set-Clipboard -Value $expected -Unicode
-            $actual = Get-Clipboard -Unicode 
+			Clipboard\Set-Clipboard -Value $expected -Unicode
+            $actual = Clipboard\Get-Clipboard -Unicode
 			$actual | Should -Be $expected
         }
 
-		It 'Verifies the clipboard can be set and retrieved as Text' `
+		It 'Verifies the clipboard can be set and retrieved as Text' -skip:($platform -ne [Platform]::Windows) `
         {
 			$expected = 'Get-Clipbooard Text test'
-			Set-Clipboard -Value $expected -Text
-            $actual = Get-Clipboard -Text 
+			Clipboard\Set-Clipboard -Value $expected -Text
+            $actual = Clipboard\Get-Clipboard -Text
 			$actual | Should -Be $expected
         }
-		
-		It 'Verifies the clipboard can be set and retrieved as HTML' `
+
+		It 'Verifies the clipboard can be set and retrieved as HTML' -skip:($platform -ne [Platform]::Windows) `
         {
 			$expected = @'
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
@@ -64,20 +99,20 @@ Describe "Clipboard" -Tag @('CI') `
 </table>
 </body></html>
 '@
-			Set-Clipboard -Value $expected -HTML
-            $actual = Get-Clipboard -HTML 
+            Clipboard\Set-Clipboard -Value $expected -HTML
+            $actual = Clipboard\Get-Clipboard -HTML
 			$actual | Should -Be $expected
         }
 
-        It 'Verifies the clipboard can be set and retrieved as a FileList (CF_HDROP)' `
+        It 'Verifies the clipboard can be set and retrieved as a FileList (CF_HDROP)' -skip:($platform -ne [Platform]::Windows) `
         {
             $expected = @(
                 [IO.Path]::Combine($TestDrive, "foo", "bar.txt"),
                 [IO.Path]::Combine($TestDrive, "bar", "bar.txt"),
                 [IO.Path]::Combine($TestDrive, "baz", "bar.txt")
             )
-            Set-Clipboard -Values $expected -FileList
-            $actual = Get-Clipboard -FileList
+            Clipboard\Set-Clipboard -Values $expected -FileList
+            $actual = Clipboard\Get-Clipboard -FileList
 
             $actual | Should -Not -BeNull
             $actual.Count | Should -Be $expected.Count
@@ -90,7 +125,7 @@ Describe "Clipboard" -Tag @('CI') `
             }
         }
 
-        It 'Verifies the clipboard can be set and retrieved as a XmlSpreadSheet' `
+        It 'Verifies the clipboard can be set and retrieved as a XmlSpreadSheet' -skip:($platform -ne [Platform]::Windows) `
         {
             $expected = @'
 <?xml version="1.0"?>
@@ -153,22 +188,22 @@ Describe "Clipboard" -Tag @('CI') `
  </Worksheet>
 </Workbook>
 '@
-            Set-Clipboard -Value $expected -XmlSpreadsheet
-            $actual = Get-Clipboard -XmlSpreadsheet 
+            Clipboard\Set-Clipboard -Value $expected -XmlSpreadsheet
+            $actual = Clipboard\Get-Clipboard -XmlSpreadsheet
 			$actual | Should -Be $expected
         }
 
-        It 'Verifies the clipboard can be set and retrieved as RTF' `
+        It 'Verifies the clipboard can be set and retrieved as RTF' -skip:($platform -ne [Platform]::Windows) `
         {
             $expected = @'
 {\rtf\ansi{\fonttbl{\f0 Consolas;}}{\colortbl;\red0\green0\blue139;\red0\green0\blue0;\red138\green43\blue226;\red0\green0\blue255;}\f0 \fs19 \cf1 \cb0 \highlight0 using\cf2  \cf1 namespace\cf2  \cf3 PowerShell.Clipboard\cf2 \par \cf4 Import-Module\cf2  \cf3 .\\Clipboard.psd1}
 '@
-            Set-Clipboard -Value $expected -Rtf
-            $actual = Get-Clipboard -Rtf 
+            Clipboard\Set-Clipboard -Value $expected -Rtf
+            $actual = Clipboard\Get-Clipboard -Rtf
 			$actual | Should -Be $expected
         }
 
-        It 'Verifies the clipboard can be set and retrieved as CSV' `
+        It 'Verifies the clipboard can be set and retrieved as CSV' -skip:($platform -ne [Platform]::Windows) `
         {
             $jsonValue = @'
 {
@@ -179,8 +214,8 @@ Describe "Clipboard" -Tag @('CI') `
 }
 '@
             $expected = ConvertFrom-Json -InputObject $jsonValue | ConvertTo-Csv | Out-String
-            Set-Clipboard -Value $expected -CSV
-            $actual = Get-Clipboard -CSV 
+            Clipboard\Set-Clipboard -Value $expected -CSV
+            $actual = Clipboard\Get-Clipboard -CSV
 			$actual | Should -Be $expected
         }
 
@@ -188,12 +223,12 @@ Describe "Clipboard" -Tag @('CI') `
 
     Context 'Get-ClipboardFormat' `
     {
-        It 'Verifies expected formats' `
+        It 'Verifies expected formats' -skip:($platform -ne [Platform]::Windows) `
         {
             $expectedFormats = @('Unicode', 'Locale', 'Text', 'OemText')
-            Set-Clipboard -Value 'Get-ClipboardFormats' -Unicode
+            Clipboard\Set-Clipboard -Value 'Get-ClipboardFormats' -Unicode
 
-            $formats = Get-ClipboardFormat
+            $formats = Clipboard\Get-ClipboardFormat
             $actualFormats = @{}
             foreach ($format in $formats)
             {
@@ -207,10 +242,10 @@ Describe "Clipboard" -Tag @('CI') `
             }
         }
 
-        It 'Verifies empty format list with clipboard is empty' `
+        It 'Verifies empty format list with clipboard is empty' -skip:($platform -ne [Platform]::Windows) `
         {
-            Clear-Clipboard
-            $formats = Get-ClipboardFormat
+            Clipboard\Clear-Clipboard
+            $formats = Clipboard\Get-ClipboardFormat
             $formats.Count | Should -Be 0
         }
     }
