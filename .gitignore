@@ -6,3 +6,5 @@
 *.vsp
 **/.vs/
 *.user
+**/bin/
+**/obj/
